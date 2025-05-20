@@ -17,7 +17,7 @@ public class Main {
         System.out.println("demote_jedi <name> <multiplier>");
         System.out.println("get_strongest_jedi <planet>");
         System.out.println("get_youngest_jedi <planet> <rank>");
-        System.out.println("get_most_used_saber_color <planet> [<rank>]");
+        System.out.println("get_most_used_saber_color <planet> <rank>");
         System.out.println("print <planet|jedi|planet1+planet2>");
         System.out.println("save <filename>");
         System.out.println("load <filename>");
@@ -112,12 +112,18 @@ public class Main {
                         }
                         break;
                     case "save":
-                        FileUtils.save(parts[1], uni);
-                        System.out.println("Saved to " + parts[1]);
+                        String outName = parts[1].toLowerCase().endsWith(".txt")
+                                ? parts[1]
+                                : parts[1] + ".txt";
+                        FileUtils.save(outName, uni);
+                        System.out.println("Saved to " + outName);
                         break;
                     case "load":
-                        uni = FileUtils.load(parts[1]);
-                        System.out.println("Loaded from " + parts[1]);
+                        String inName = parts[1].toLowerCase().endsWith(".txt")
+                                ? parts[1]
+                                : parts[1] + ".txt";
+                        uni = FileUtils.load(inName);
+                        System.out.println("Loaded from " + inName);
                         break;
                     case "help":
                         printGuide();
@@ -126,7 +132,7 @@ public class Main {
                         System.out.println("Goodbye!");
                         return;
                     default:
-                        System.out.println("Unknown command. Type 'help' for guidance.");
+                        System.out.println("Unknown command. Type 'help' for guide.");
                 }
             } catch (Exception e) {
                 System.out.println("Error: " + e.getMessage());
