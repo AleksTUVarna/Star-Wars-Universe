@@ -1,186 +1,273 @@
 package commands;
 
 import java.io.Serializable;
+import java.util.Collection;
 import java.util.*;
 import models.Jedi;
 import models.Planet;
 import models.Rank;
 
 public class StarWarsUniverse implements Serializable {
-    // helper: retrieve a planet by name (case-insensitive)
-    public models.Planet getPlanet(String name) {
-        if (name == null) return null;
-        return planets.get(name.toLowerCase());
-    }
     private Map<String, Planet> planets = new HashMap<>();
     private Map<String, String> jediLocation = new HashMap<>();
 
+    // връща колекция от всички планети
+    public Collection<Planet> getPlanets() {
+        return planets.values();
+    }
+
+    // връща планета по име (без разлика в главни/малки букви!!!)
+    public Planet getPlanet(String name) {
+        if (name == null) {
+            return null;
+        }
+        return planets.get(name.toLowerCase());
+    }
+
+    // добавя нова планета
     public boolean addPlanet(String name) {
         String key = name.toLowerCase();
-        if (planets.containsKey(key)) return false;
+        if (planets.containsKey(key)) {
+            return false;
+        }
         planets.put(key, new Planet(name));
         return true;
     }
 
+    // създава нов джедай на планетата, ако е валиден
     public boolean createJedi(String planetName, Jedi jedi) {
-        String pkey = planetName.toLowerCase();
-        if (!planets.containsKey(pkey)) return false;
-        if (jediLocation.containsKey(jedi.getName().toLowerCase())) return false;
-        Planet p = planets.get(pkey);
-        if (p.addJedi(jedi)) {
-            jediLocation.put(jedi.getName().toLowerCase(), pkey);
-            return true;
+        if (jedi == null) {
+            return false;
         }
-        return false;
+        // проверка на сила между 1 и 2
+        double str = jedi.getStrength();
+        if (str < 1.0 || str > 2.0) {
+            return false;
+        }
+        Planet planet = getPlanet(planetName);
+        if (planet == null) {
+            return false;
+        }
+        String jediKey = jedi.getName().toLowerCase();
+        // не трябва да съществува друг джедай със същото име!!!
+        if (jediLocation.containsKey(jediKey)) {
+            return false;
+        }
+        if (!planet.addJedi(jedi)) {
+            return false;
+        }
+        jediLocation.put(jediKey, planetName.toLowerCase());
+        return true;
     }
 
+    // премахва джедай от планетата
     public boolean removeJedi(String name, String planetName) {
-        String pkey = planetName.toLowerCase();
-        Planet p = planets.get(pkey);
-        if (p == null) return false;
-        if (p.removeJedi(name)) {
+        Planet planet = getPlanet(planetName);
+        if (planet == null) {
+            return false;
+        }
+        boolean removed = planet.removeJedi(name);
+        if (removed) {
             jediLocation.remove(name.toLowerCase());
+        }
+        return removed;
+    }
+
+    // повишава ранг и сила
+    public boolean promoteJedi(String name, double multiplier) {
+        if (multiplier <= 0) {
+            return false;
+        }
+        String locKey = jediLocation.get(name.toLowerCase());
+        if (locKey == null) {
+            return false;
+        }
+        Planet planet = planets.get(locKey);
+        for (Jedi j : planet.getJedis()) {
+            if (!j.getName().equalsIgnoreCase(name)) {
+                continue;
+            }
+            int rankIndex = j.getRank().ordinal();
+            if (rankIndex >= Rank.values().length - 1) {
+                return false;
+            }
+            // Правим повишение
+            Rank nextRank = Rank.values()[rankIndex + 1];
+            j.setRank(nextRank);
+            double newStrength = j.getStrength() * (1 + multiplier);
+            // Clamp до максимум 2.0
+            if (newStrength > 2.0) {
+                newStrength = 2.0;
+            }
+            j.setStrength(newStrength);
             return true;
         }
         return false;
     }
 
-    public boolean promoteJedi(String name, double mult) {
-        if (mult <= 0) return false;
-        String key = name.toLowerCase();
-        String pkey = jediLocation.get(key);
-        if (pkey == null) return false;
-        Planet p = planets.get(pkey);
-        for (Jedi j : p.getJedis()) {
-            if (j.getName().equalsIgnoreCase(name)) {
-                int idx = j.getRank().ordinal();
-                if (idx < Rank.values().length - 1) {
-                    Rank next = Rank.values()[idx+1];
-                    j.setRank(next);
-                    j.setStrength(j.getStrength() * (1 + mult));
-                    return true;
-                }
+    // понижава ранг и сила
+    public boolean demoteJedi(String name, double multiplier) {
+        if (multiplier <= 0) {
+            return false;
+        }
+        String locKey = jediLocation.get(name.toLowerCase());
+        if (locKey == null) {
+            return false;
+        }
+        Planet planet = planets.get(locKey);
+        for (Jedi j : planet.getJedis()) {
+            if (!j.getName().equalsIgnoreCase(name)) {
+                continue;
             }
+            int rankIndex = j.getRank().ordinal();
+            if (rankIndex <= 0) {
+                return false;
+            }
+            // Правим понижение
+            Rank prevRank = Rank.values()[rankIndex - 1];
+            j.setRank(prevRank);
+            double newStrength = j.getStrength() * (1 - multiplier);
+            // Clamp до минимум 1.0
+            if (newStrength < 1.0) {
+                newStrength = 1.0;
+            }
+            j.setStrength(newStrength);
+            return true;
         }
         return false;
     }
 
-    public boolean demoteJedi(String name, double mult) {
-        if (mult <= 0) return false;
-        String key = name.toLowerCase();
-        String pkey = jediLocation.get(key);
-        if (pkey == null) return false;
-        Planet p = planets.get(pkey);
-        for (Jedi j : p.getJedis()) {
-            if (j.getName().equalsIgnoreCase(name)) {
-                int idx = j.getRank().ordinal();
-                if (idx > 0) {
-                    Rank prev = Rank.values()[idx-1];
-                    j.setRank(prev);
-                    double newStr = j.getStrength() * (1 - mult);
-                    j.setStrength(newStr < 0 ? 0 : newStr);
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
+    // най-силния джедай на планета
     public Jedi getStrongestJedi(String planetName) {
-        Planet p = planets.get(planetName.toLowerCase());
-        if (p == null || p.getJedis().isEmpty()) return null;
-        Jedi best = null;
-        for (Jedi j : p.getJedis()) {
-            if (best == null || j.getStrength() > best.getStrength()) best = j;
+        Planet planet = getPlanet(planetName);
+        if (planet == null || planet.getJedis().isEmpty()) {
+            return null;
         }
-        return best;
+        Jedi strongest = planet.getJedis().get(0);
+        for (Jedi j : planet.getJedis()) {
+            if (j.getStrength() > strongest.getStrength()) {
+                strongest = j;
+            }
+        }
+        return strongest;
     }
 
-    public Jedi getYoungestJedi(String planetName, Rank rnk) {
-        Planet p = planets.get(planetName.toLowerCase());
-        if (p == null) return null;
+    // Намира най-младия джедай с определен ранг
+    public Jedi getYoungestJedi(String planetName, Rank rank) {
+        Planet planet = getPlanet(planetName);
+        if (planet == null) {
+            return null;
+        }
         Jedi youngest = null;
-        for (Jedi j : p.getJedis()) {
-            if (j.getRank() == rnk) {
-                if (youngest == null || j.getAge() < youngest.getAge() ||
-                        (j.getAge() == youngest.getAge() && j.getName().compareToIgnoreCase(youngest.getName()) < 0)) {
-                    youngest = j;
-                }
+        for (Jedi j : planet.getJedis()) {
+            if (j.getRank() != rank) {
+                continue;
+            }
+            if (youngest == null || j.getAge() < youngest.getAge() ||
+                    (j.getAge() == youngest.getAge() &&
+                            j.getName().compareToIgnoreCase(youngest.getName()) < 0)) {
+                youngest = j;
             }
         }
         return youngest;
     }
 
-    public String getMostUsedSaberColor(String planetName, Rank rnk) {
-        Planet p = planets.get(planetName.toLowerCase());
-        if (p == null) return null;
-        Map<String,Integer> count = new HashMap<>();
-        for (Jedi j : p.getJedis()) {
-            if (j.getRank() == rnk) {
-                String c = j.getSaberColor().toLowerCase();
-                count.put(c, count.getOrDefault(c,0)+1);
+    // най-често използвания цвят на меча за даден ранг
+    public String getMostUsedSaberColor(String planetName, Rank rank) {
+        Planet planet = getPlanet(planetName);
+        if (planet == null) {
+            return null;
+        }
+        Map<String, Integer> count = new HashMap<>();
+        for (Jedi j : planet.getJedis()) {
+            if (j.getRank() != rank) {
+                continue;
+            }
+            String color = j.getSaberColor();
+            count.put(color, count.getOrDefault(color, 0) + 1);
+        }
+        String most = null;
+        int max = 0;
+        for (Map.Entry<String, Integer> e : count.entrySet()) {
+            if (e.getValue() > max) {
+                most = e.getKey();
+                max = e.getValue();
             }
         }
-        String best = null; int max=0;
-        for (Map.Entry<String,Integer> e : count.entrySet()) {
-            if (e.getValue() > max) { max = e.getValue(); best = e.getKey(); }
-        }
-        return best;
+        return most;
     }
 
+    // най-често използвания цвят на меча сред GRAND_MASTER
     public String getMostUsedSaberColor(String planetName) {
-        Planet p = planets.get(planetName.toLowerCase());
-        if (p == null) return null;
-        Map<String,Integer> count = new HashMap<>();
-        for (Jedi j : p.getJedis()) {
-            if (j.getRank() == Rank.GRAND_MASTER) {
-                String c = j.getSaberColor().toLowerCase();
-                count.put(c, count.getOrDefault(c,0)+1);
-            }
-        }
-        String best = null; int max=0;
-        for (Map.Entry<String,Integer> e : count.entrySet()) {
-            if (e.getValue() > max) { max = e.getValue(); best = e.getKey(); }
-        }
-        return best;
+        return getMostUsedSaberColor(planetName, Rank.GRAND_MASTER);
     }
 
+    // принтира планета и джедаите, сортирани по ранг и име
     public void printPlanet(String planetName) {
-        Planet p = planets.get(planetName.toLowerCase());
-        if (p == null) {
-            System.out.println("Planet not found."); return;
+        Planet planet = getPlanet(planetName);
+        if (planet == null) {
+            System.out.println("Planet not found.");
+            return;
         }
-        System.out.println("Planet: " + p.getName());
-        for (Jedi j : p.getJedis()) System.out.println("  " + j);
+        System.out.println("Planet: " + planet.getName());
+        List<Jedi> list = new ArrayList<>(planet.getJedis());
+        Collections.sort(list, new Comparator<Jedi>() {
+            @Override
+            public int compare(Jedi j1, Jedi j2) {
+                int cmp = j1.getRank().ordinal() - j2.getRank().ordinal();
+                if (cmp != 0) {
+                    return cmp;
+                }
+                return j1.getName().compareToIgnoreCase(j2.getName());
+            }
+        });
+        for (Jedi j : list) {
+            System.out.println("  " + j);
+        }
     }
 
+    // принтира информация за един джедай и на коя планета е
     public void printJedi(String jediName) {
-        String key = jediName.toLowerCase();
-        String pkey = jediLocation.get(key);
-        if (pkey == null) { System.out.println("Jedi not found."); return; }
-        Planet p = planets.get(pkey);
-        for (Jedi j : p.getJedis()) {
+        String locKey = jediLocation.get(jediName.toLowerCase());
+        if (locKey == null) {
+            System.out.println("Jedi not found.");
+            return;
+        }
+        Planet planet = planets.get(locKey);
+        for (Jedi j : planet.getJedis()) {
             if (j.getName().equalsIgnoreCase(jediName)) {
-                System.out.println(j + " on " + p.getName()); return;
+                System.out.println(j + " on " + planet.getName());
+                return;
             }
         }
     }
 
-    public void printUnion(String p1, String p2) {
-        Planet a = planets.get(p1.toLowerCase());
-        Planet b = planets.get(p2.toLowerCase());
-        if (a == null || b == null) {
+    // принтира обединение на две планети с пълна информация
+    public void printUnion(String planet1, String planet2) {
+        Planet p1 = getPlanet(planet1);
+        Planet p2 = getPlanet(planet2);
+        if (p1 == null || p2 == null) {
             System.out.println("One or both planets not found.");
             return;
         }
         List<Jedi> combined = new ArrayList<>();
-        combined.addAll(a.getJedis());
-        combined.addAll(b.getJedis());
-        combined.sort(Comparator.comparing(Jedi::getName, String.CASE_INSENSITIVE_ORDER));
+        combined.addAll(p1.getJedis());
+        combined.addAll(p2.getJedis());
+        Collections.sort(combined, new Comparator<Jedi>() {
+            @Override
+            public int compare(Jedi j1, Jedi j2) {
+                return j1.getName().compareToIgnoreCase(j2.getName());
+            }
+        });
         for (Jedi j : combined) {
-            String loc = jediLocation.get(j.getName().toLowerCase());
-            String original = planets.get(loc).getName();
-            System.out.println(j.getName() + " (from " + original + ")");
+            String originKey = jediLocation.get(j.getName().toLowerCase());
+            String origin;
+            if (originKey != null && planets.containsKey(originKey)) {
+                origin = planets.get(originKey).getName();
+            } else {
+                origin = "Unknown";
+            }
+            System.out.println(j + " from " + origin);
         }
     }
 }
